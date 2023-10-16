@@ -1,4 +1,4 @@
-use logging_system::{write_data_into_file, retrieve_from_log_n};
+use logging_system::Logger;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -16,27 +16,53 @@ struct Dummy {
 
 fn main() {
     
-    // creating generic objects to test the functions
-    let objects = vec![
-        DummyObjects { a: 12, b: 10},
-        DummyObjects { a: 8, b: 9},
-        DummyObjects { a: 7, b: 8},
-    ];
-    let dummy = Dummy {
-        id: 8,
-        comment: "test".to_string(),
-        objects: objects,
-    };
+    // creating a logger object
+    let logger = Logger::new("test_logger.log");
 
-    // Using the writing function
-    match write_data_into_file("test1.log", &dummy) {
-        Ok(_) => println!("Succeded in writing in the file"),
-        Err(e) => println!("Something went wrong: {e}"),
-    };
+    // let's check if the file is open
+    let open = logger.file.metadata().is_ok();
+    if open {
+        println!("File open!");
+    } else {
+        println!("File is closed!");
+    }
+
+    // creating a for loop so that we can check how the write is happening
+    for i in 0..5 {
+
+        // creating generic objects to test the functions
+        let objects = vec![
+            DummyObjects { a: i, b: i},
+            DummyObjects { a: i, b: i},
+            DummyObjects { a: i, b: i},
+        ];    
+        
+        let dummy = Dummy {
+            id: i,
+            comment: "test".to_string(),
+            objects: objects,
+        };
+    
+        // Using the writing function
+        match logger.write_data_into_file(&dummy) {
+            Ok(_) => println!("Succeded in writing in the file"),
+            Err(e) => println!("Something went wrong: {e}"),
+        };
+
+    }
+
+    // let's check if the file is open
+    let open = logger.file.metadata().is_ok();
+    if open {
+        println!("File open!");
+    } else {
+        println!("File is closed!");
+    }
 
     // Using the retrieving function
-    let objects = retrieve_from_log_n(&"test1.log".to_string()).unwrap();
+    let objects = logger.retrieve_iterator_from_log().unwrap();
 
+    // checking the contents
     let mut dummies: Vec<Dummy> = Vec::new();
     for item in objects {
         let json_item = item.unwrap();
@@ -48,6 +74,14 @@ fn main() {
     // printing the retrieved objects
     for dummy in dummies {
         println!("Dummy found! {:#?}", dummy);
+    }
+
+    // let's check if the file is open
+    let open = logger.file.metadata().is_ok();
+    if open {
+        println!("File open!");
+    } else {
+        println!("File is closed!");
     }
 
 }
