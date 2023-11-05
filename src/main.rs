@@ -1,3 +1,4 @@
+use std::io;
 use logging_system::Logger;
 use serde::{Deserialize, Serialize};
 
@@ -15,21 +16,17 @@ struct Dummy {
 }
 
 fn main() {
+
+    // creating two different logger objects, one to test JSON and one to test bin
+    // JSON logger object
+    let logger_json = Logger::new("json_test.log");
+    // Bin logger object
+    //let logger_bin = Logger::new("bin_test.log");
     
-    // creating a logger object
-    let logger = Logger::new("test_logger.log");
+    // just so that objects have different ids
+    let mut i = 0;
 
-    // let's check if the file is open
-    let open = logger.file.metadata().is_ok();
-    if open {
-        println!("File open!");
-    } else {
-        println!("File is closed!");
-    }
-
-    // creating a for loop so that we can check how the write is happening
-    for i in 0..5 {
-
+    loop {
         // creating generic objects to test the functions
         let objects = vec![
             DummyObjects { a: i, b: i},
@@ -42,46 +39,62 @@ fn main() {
             comment: "test".to_string(),
             objects: objects,
         };
-    
-        // Using the writing function
-        match logger.write_data_into_file(&dummy) {
-            Ok(_) => println!("Succeded in writing in the file"),
-            Err(e) => println!("Something went wrong: {e}"),
+
+        // Mini menu
+        println!();
+        println!("Choose from these options bleow:");
+        println!("1 - Write JSON objects to file");
+        println!("2 - Recover JSON objects from file");
+        println!("3 -");
+        println!("4 -");
+        println!("5 - Exit the application");
+
+        // getting input
+        let mut choice = String::new();
+        io::stdin().read_line(&mut choice).expect("Failed to read line");
+
+        let choice: u32 = match choice.trim().parse() {
+            Ok(num) => {
+                if num == 1 || num == 3 {
+                    i = i + 1;
+                }
+                num
+            },
+            Err(_) => continue,
+        } ;
+
+        match choice {
+            1 => {
+                // Using the writing function
+                match logger_json.write_data_into_file(&dummy) {
+                    Ok(_) => println!("Succeded in writing in the file"),
+                    Err(e) => println!("Something went wrong: {e}"),
+                };
+                println!("Wrote the JSON data succesfully!");
+            },
+            2 => {
+                    // Using the retrieving function
+                    let objects = logger_json.retrieve_iterator_from_log().unwrap();
+
+                    // checking the contents
+                    let mut dummies: Vec<Dummy> = Vec::new();
+                    for item in objects {
+                        let json_item = item.unwrap();
+                        //println!("Got {:#?}", json_item);
+                        
+                        dummies.push(serde_json::from_value::<Dummy>(json_item).unwrap())
+                    }
+
+                    // printing the retrieved objects
+                    for dummy in dummies {
+                        println!("Dummy found! {:#?}", dummy);
+                    }
+            },
+            3 => println!("TODO: Write bin data into file"),
+            4 => println!("TODO: Retrieve data from bin file"),
+            5 => break,
+            _ => println!("Not a valid command!"),
         };
-
-    }
-
-    // let's check if the file is open
-    let open = logger.file.metadata().is_ok();
-    if open {
-        println!("File open!");
-    } else {
-        println!("File is closed!");
-    }
-
-    // Using the retrieving function
-    let objects = logger.retrieve_iterator_from_log().unwrap();
-
-    // checking the contents
-    let mut dummies: Vec<Dummy> = Vec::new();
-    for item in objects {
-        let json_item = item.unwrap();
-        //println!("Got {:#?}", json_item);
-        
-        dummies.push(serde_json::from_value::<Dummy>(json_item).unwrap())
-    }
-
-    // printing the retrieved objects
-    for dummy in dummies {
-        println!("Dummy found! {:#?}", dummy);
-    }
-
-    // let's check if the file is open
-    let open = logger.file.metadata().is_ok();
-    if open {
-        println!("File open!");
-    } else {
-        println!("File is closed!");
     }
 
 }
