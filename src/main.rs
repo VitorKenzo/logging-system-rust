@@ -1,5 +1,5 @@
 use std::io;
-use logging_system::Logger;
+use logging_system::{Logger, BinLogger};
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -21,7 +21,7 @@ fn main() {
     // JSON logger object
     let logger_json = Logger::new("json_test.log");
     // Bin logger object
-    //let logger_bin = Logger::new("bin_test.log");
+    let logger_bin = BinLogger::new("bin_test.log");
     
     // just so that objects have different ids
     let mut i = 0;
@@ -43,10 +43,10 @@ fn main() {
         // Mini menu
         println!();
         println!("Choose from these options bleow:");
-        println!("1 - Write JSON objects to file");
-        println!("2 - Recover JSON objects from file");
-        println!("3 -");
-        println!("4 -");
+        println!("1 - Write objects as JSON onto file");
+        println!("2 - Recover objects from JSON format file");
+        println!("3 - Write objects in Binary format onto a file");
+        println!("4 - Recover objects from binary format file");
         println!("5 - Exit the application");
 
         // getting input
@@ -66,15 +66,15 @@ fn main() {
         match choice {
             1 => {
                 // Using the writing function
-                match logger_json.write_data_into_file(&dummy) {
-                    Ok(_) => println!("Succeded in writing in the file"),
+                println!("Writing objects as JSON...");
+                match logger_json.write_data(&dummy) {
+                    Ok(_) => println!("Succeded in writing in the file."),
                     Err(e) => println!("Something went wrong: {e}"),
                 };
-                println!("Wrote the JSON data succesfully!");
             },
             2 => {
                     // Using the retrieving function
-                    let objects = logger_json.retrieve_iterator_from_log().unwrap();
+                    let objects = logger_json.retrieve_iterator().unwrap();
 
                     // checking the contents
                     let mut dummies: Vec<Dummy> = Vec::new();
@@ -90,8 +90,20 @@ fn main() {
                         println!("Dummy found! {:#?}", dummy);
                     }
             },
-            3 => println!("TODO: Write bin data into file"),
-            4 => println!("TODO: Retrieve data from bin file"),
+            3 => {
+                println!("Writing objects in binary format...");
+                match logger_bin.write_data(&dummy) {
+                    Ok(_) => println!("Succeded in writing in the file."),
+                    Err(e) => println!("Something went wrong: {e}"),
+                };
+            },
+            4 => {
+                let objects = logger_bin.retrieve_iterator::<Dummy>().expect("Could not retrieve iterator");
+                
+                for dummy in objects {
+                    println!("Dummy found! {:#?}", dummy)
+                }
+            },
             5 => break,
             _ => println!("Not a valid command!"),
         };

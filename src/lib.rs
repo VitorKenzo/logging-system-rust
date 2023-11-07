@@ -2,8 +2,10 @@
 //! Ultimately we are going to have two big functionalities: one to write and one to read from a given file
 
 use std::{fs, fs::File, io::{Write, BufWriter, BufReader}};
-use serde::Serialize;
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Deserializer, Value, Error};
+use anyhow::{Context, Result};
+use bincode;
 
 pub struct Logger {
     pub file: File,
@@ -44,13 +46,14 @@ impl Logger {
     ///  # Panics
     /// 
     /// This function will panic in any case of an IO error
-    pub fn write_data_into_file<T: Serialize>(&self, data: T) -> std::io::Result<()> {
+    pub fn write_data<T: Serialize>(&self, data: T) -> std::io::Result<()> {
         
         let mut writer = BufWriter::new(&self.file);
 
-        let data_string = serde_json::to_string(&data);
+        // the to_vec funciton will give us a byte vector that can go directly to the writer
+        let data_string = serde_json::to_vec(&data);
 
-        writer.write_all(&data_string.unwrap().as_bytes())?;
+        writer.write_all(&data_string.unwrap())?;
         writer.flush()?;
 
         Ok(())
@@ -67,7 +70,7 @@ impl Logger {
     ///  # Panics
     /// 
     /// This function panics in case the file does not exist.
-    pub fn retrieve_iterator_from_log(&self) -> Result<impl Iterator<Item = Result<Value, Error>>, std::io::Error>{
+    pub fn retrieve_iterator(&self) -> Result<impl Iterator<Item = Result<Value, Error>>, std::io::Error>{
 
         let file = File::open(&self.file_name)?;
         let reader = BufReader::new(file);
@@ -80,4 +83,49 @@ impl Logger {
         
         Ok(iterator)
     }
+}
+
+pub struct BinLogger {
+    file: File,
+    file_name:  String,
+}
+
+impl BinLogger {
+
+    pub fn new(path: &str) -> BinLogger {
+        // creating the new log file
+        let file = fs::OpenOptions::new().create(true).append(true).open(path);
+
+        BinLogger { 
+            file: file.unwrap(),
+            file_name: path.to_string(),  
+        }    
+    }
+
+    pub fn write_data<T: Serialize>(&self, data: &T) -> std::io::Result<()> {
+        
+        let mut writer = BufWriter::new(&self.file);
+    
+        let bytes = bincode::serialize(&data);
+
+        writer.write_all(&bytes.unwrap())?;
+        writer.flush()?;
+
+        Ok(())
+        
+    }
+
+    pub fn retrieve_iterator<T: DeserializeOwned>(&self) -> Result<impl Iterator<Item = T>>{
+        
+        let file = File::open(&self.file_name).with_context(|| format!("Unable to open file {}.", self.file_name))?;
+        let reader = BufReader::new(file);
+
+        println!("Opened file and buf reader succesfully");
+
+        let items: Vec<T> = bincode::deserialize_from(reader).with_context(|| "Failed to deserialize the data.")?;
+
+        Ok(items.into_iter())
+
+    }
+
 }
