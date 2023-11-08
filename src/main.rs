@@ -98,11 +98,12 @@ fn main() {
                 };
             },
             4 => {
-                let objects = logger_bin.retrieve_iterator::<Dummy>().expect("Could not retrieve iterator");
+                println!("TODO");
+                // let objects = logger_bin.retrieve_iterator::<Dummy>().expect("Could not retrieve iterator");
                 
-                for dummy in objects {
-                    println!("Dummy found! {:#?}", dummy)
-                }
+                // for dummy in objects {
+                //     println!("Dummy found! {:#?}", dummy)
+                // }
             },
             5 => break,
             _ => println!("Not a valid command!"),

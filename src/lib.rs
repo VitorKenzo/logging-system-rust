@@ -2,10 +2,10 @@
 //! Ultimately we are going to have two big functionalities: one to write and one to read from a given file
 
 use std::{fs, fs::File, io::{Write, BufWriter, BufReader}};
-use serde::{Serialize, de::DeserializeOwned};
-use serde_json::{Deserializer, Value, Error};
-use anyhow::{Context, Result};
-use bincode;
+use serde::Serialize;
+use serde_json::{Deserializer, Value as JSON_Value, Error};
+//use rmpv::Value as RMP_Value;
+//use rmp_serde::decode::Deserializer as RMP_Deserializer;
 
 pub struct Logger {
     pub file: File,
@@ -70,7 +70,7 @@ impl Logger {
     ///  # Panics
     /// 
     /// This function panics in case the file does not exist.
-    pub fn retrieve_iterator(&self) -> Result<impl Iterator<Item = Result<Value, Error>>, std::io::Error>{
+    pub fn retrieve_iterator(&self) -> Result<impl Iterator<Item = Result<JSON_Value, Error>>, std::io::Error> {
 
         let file = File::open(&self.file_name)?;
         let reader = BufReader::new(file);
@@ -79,7 +79,7 @@ impl Logger {
         let deserilizer = Deserializer::from_reader(reader);
         // the type of the below variable is serde_json::StreamDeserializer<'_, serde_json::de::IoRead<BufReader<File>>, Value>
         // more information here https://docs.rs/serde_json/latest/serde_json/struct.StreamDeserializer.html
-        let iterator = deserilizer.into_iter::<Value>();
+        let iterator = deserilizer.into_iter::<JSON_Value>();
         
         Ok(iterator)
     }
@@ -106,7 +106,7 @@ impl BinLogger {
         
         let mut writer = BufWriter::new(&self.file);
     
-        let bytes = bincode::serialize(&data);
+        let bytes = rmp_serde::to_vec_named(&data);
 
         writer.write_all(&bytes.unwrap())?;
         writer.flush()?;
@@ -115,16 +115,9 @@ impl BinLogger {
         
     }
 
-    pub fn retrieve_iterator<T: DeserializeOwned>(&self) -> Result<impl Iterator<Item = T>>{
+    pub fn retrieve_iterator(&self) {
         
-        let file = File::open(&self.file_name).with_context(|| format!("Unable to open file {}.", self.file_name))?;
-        let reader = BufReader::new(file);
-
-        println!("Opened file and buf reader succesfully");
-
-        let items: Vec<T> = bincode::deserialize_from(reader).with_context(|| "Failed to deserialize the data.")?;
-
-        Ok(items.into_iter())
+        println!("TODO! {}", self.file_name);
 
     }
 
