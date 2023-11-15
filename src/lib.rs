@@ -1,11 +1,11 @@
 //! In this library we pretend to create a crate to be able to log different objects into a file
 //! Ultimately we are going to have two big functionalities: one to write and one to read from a given file
 
-use std::{fs, fs::File, io::{Write, BufWriter, BufReader}};
-use serde::Serialize;
-use serde_json::{Deserializer, Value as JSON_Value, Error};
-//use rmpv::Value as RMP_Value;
-//use rmp_serde::decode::Deserializer as RMP_Deserializer;
+use std::{fs, fs::File, io::{Write, BufWriter, BufReader}, marker::{self, PhantomData}};
+use serde::{Serialize, Deserialize, de::DeserializeOwned};
+use serde_json::{Deserializer as JSONDeserializer, Value as JSON_Value, Error as JSONError};
+use serde_cbor::Error as CBORError;
+
 
 pub struct Logger {
     pub file: File,
@@ -70,54 +70,73 @@ impl Logger {
     ///  # Panics
     /// 
     /// This function panics in case the file does not exist.
-    pub fn retrieve_iterator(&self) -> Result<impl Iterator<Item = Result<JSON_Value, Error>>, std::io::Error> {
+    pub fn retrieve_iterator(&self) -> Result<impl Iterator<Item = Result<JSON_Value, JSONError>>, std::io::Error> {
 
         let file = File::open(&self.file_name)?;
         let reader = BufReader::new(file);
 
         // this can be a one liner
-        let deserilizer = Deserializer::from_reader(reader);
+        let deserializer = JSONDeserializer::from_reader(reader);
         // the type of the below variable is serde_json::StreamDeserializer<'_, serde_json::de::IoRead<BufReader<File>>, Value>
         // more information here https://docs.rs/serde_json/latest/serde_json/struct.StreamDeserializer.html
-        let iterator = deserilizer.into_iter::<JSON_Value>();
+        let iterator = deserializer.into_iter::<JSON_Value>();
         
         Ok(iterator)
     }
 }
 
-pub struct BinLogger {
+pub struct BinLogger<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>>{
     file: File,
     file_name:  String,
+    // unsafe rust!
+    _data_type: marker::PhantomData<T>
 }
 
-impl BinLogger {
+impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
 
-    pub fn new(path: &str) -> BinLogger {
+    pub fn new(path: &str) -> BinLogger<T> {
         // creating the new log file
         let file = fs::OpenOptions::new().create(true).append(true).open(path);
 
         BinLogger { 
             file: file.unwrap(),
-            file_name: path.to_string(),  
+            file_name: path.to_string(), 
+            _data_type: PhantomData::<T>
         }    
     }
 
-    pub fn write_data<T: Serialize>(&self, data: &T) -> std::io::Result<()> {
+    pub fn write_data(&self, data: &T) -> std::io::Result<()> {
         
         let mut writer = BufWriter::new(&self.file);
-    
-        let bytes = rmp_serde::to_vec_named(&data);
-
-        writer.write_all(&bytes.unwrap())?;
+        
+        let bytes = serde_cbor::to_vec(&data).expect("Failed to serialize");
+        
+        writer.write_all(&bytes)?;
         writer.flush()?;
 
         Ok(())
-        
+
     }
 
-    pub fn retrieve_iterator(&self) {
+    pub fn retrieve_iterator(&self) -> Result<impl Iterator<Item = T>, std::io::Error> {
         
-        println!("TODO! {}", self.file_name);
+        let file = File::open(&self.file_name)?;
+        let reader = BufReader::new(file);
+
+        let content = serde_cbor::from_reader(reader).into_iter();
+
+        Ok(content)
+
+    }
+
+    pub fn retrieve_obj(&self) -> Result<T, std::io::Error> {
+        
+        let file = File::open(&self.file_name)?;
+        let reader = BufReader::new(file);
+
+        let content: Result<T, CBORError> = serde_cbor::from_reader(reader);
+        
+        Ok(content.expect("Error in deserializing"))
 
     }
 

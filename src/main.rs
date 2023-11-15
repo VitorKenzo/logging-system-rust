@@ -2,6 +2,7 @@ use std::io;
 use logging_system::{Logger, BinLogger};
 use serde::{Deserialize, Serialize};
 
+
 #[derive(Deserialize, Serialize, Debug)]
 struct DummyObjects {
     a: u32,
@@ -20,8 +21,9 @@ fn main() {
     // creating two different logger objects, one to test JSON and one to test bin
     // JSON logger object
     let logger_json = Logger::new("json_test.log");
-    // Bin logger object
-    let logger_bin = BinLogger::new("bin_test.log");
+    
+    // Bin logger object associated with our type Dummy
+    let logger_bin: BinLogger<Dummy> = BinLogger::new("bin_test.log");
     
     // just so that objects have different ids
     let mut i = 0;
@@ -66,7 +68,7 @@ fn main() {
         match choice {
             1 => {
                 // Using the writing function
-                println!("Writing objects as JSON...");
+                println!("Writing object as JSON...");
                 match logger_json.write_data(&dummy) {
                     Ok(_) => println!("Succeded in writing in the file."),
                     Err(e) => println!("Something went wrong: {e}"),
@@ -91,21 +93,25 @@ fn main() {
                     }
             },
             3 => {
-                println!("Writing objects in binary format...");
+                println!("Writing object in binary format...");
                 match logger_bin.write_data(&dummy) {
                     Ok(_) => println!("Succeded in writing in the file."),
                     Err(e) => println!("Something went wrong: {e}"),
                 };
             },
             4 => {
-                println!("TODO");
-                // let objects = logger_bin.retrieve_iterator::<Dummy>().expect("Could not retrieve iterator");
-                
-                // for dummy in objects {
-                //     println!("Dummy found! {:#?}", dummy)
-                // }
+                let objects = logger_bin.retrieve_iterator().unwrap();
+
+                for object in objects {
+                    println!("Dummy found! {:#?}", object);
+                }
             },
             5 => break,
+            6 => {
+                let object = logger_bin.retrieve_obj().unwrap();
+
+                println!("Dummy found {:#?}", object)
+            }
             _ => println!("Not a valid command!"),
         };
     }
