@@ -1,51 +1,81 @@
 //! In this library we pretend to create a crate to be able to log different objects into a file
 //! Ultimately we are going to have two big functionalities: one to write and one to read from a given file
+//! We will give to ways to log the objects. One will be in the human-readable JSON format and the other
+//! will be using the binary format MessagePackr
 
 use std::{fs, fs::File, io::{Write, BufWriter, BufReader}, marker::{self, PhantomData}};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use serde_json::{Deserializer as JSONDeserializer, Value as JSON_Value, Error as JSONError};
-use serde_cbor::Error as CBORError;
+use rmp_serde;
 
-
-pub struct Logger {
-    pub file: File,
-    //file: File,
+/// A basic logger for serializing and deserializing data to and from a JSON log file.
+///
+/// The `JSONLogger` struct allows you to log data to a JSON file. It provides methods for
+/// creating a new logger, writing data to the log file, and retrieving an iterator
+/// over the logged items.
+/// 
+/// It can be used to serialize any struct
+/// for example as long as you derive the Serialize and Deserialize traits from serde such as
+/// 
+/// #[derive(Deserialize, Serialize)]
+/// Struct test {...}
+///
+/// # Examples
+///
+/// ```
+/// use logging_system::JSONLogger;
+///
+/// // Create a new Logger for logging JSON values to a file named "json_test.log".
+/// let logger_json = JSONLogger::new("json_test.log");
+///
+/// // Write data to the log file.
+/// match logger_json.write_data(&dummy) {
+///     Ok(_) => println!("Succeded in writing in the file."),
+///     Err(e) => println!("Something went wrong: {e}"),
+//  };
+///
+/// // Retrieve an iterator over the logged items.
+/// let iterator = logger_json.retrieve_iterator().expect("Failed to retrieve iterator");
+/// 
+/// let mut dummies: Vec<Dummy> = Vec::new();
+/// for item in objects {
+///     let json_item = item.unwrap();
+///     dummies.push(serde_json::from_value::<Dummy>(json_item).unwrap())
+/// }
+/// 
+/// ```
+pub struct JSONLogger {
+    //pub file: File,
+    /// The file handle for the log file.
+    file: File,
+    /// The name of the log file.
     file_name: String,
 }
 
-impl Logger {
+impl JSONLogger {
 
-    /// Creates the Logger object that has a reference for the File object created and the name given to the file
-    /// 
-    /// This function will create the new file and attatch a file object to it that will be used to write in the file.
-    /// The reading function only uses the path to retrieve from the file.
-    /// If the file already exists it only opens it in append mode so that you can keep writing on it.
-    /// 
-    /// # Panics
-    /// 
-    /// It panics with it`s not able to create the file
-    pub fn new(path: &str) -> Logger {
-
-        // creating the new log file
+    /// Creates a new `Logger` instance for logging data to the specified file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A string representing the file path for the log file.
+    ///
+    pub fn new(path: &str) -> JSONLogger {
+        // creating or opening the log file
         let file = fs::OpenOptions::new().create(true).append(true).open(path);
 
-        Logger { 
+        JSONLogger { 
             file: file.unwrap(),
             file_name: path.to_string(),  
         }
-    
     }
 
-    /// Write the data object passed into the specified file
-    /// 
-    /// This function takes as paramater a Serializable data and properly writes it into a file
-    /// that was created in the logger creation.
-    /// 
-    /// The file is sure to exist and the function always append to the file, even with multiple executions
-    /// 
-    ///  # Panics
-    /// 
-    /// This function will panic in any case of an IO error
+    /// Writes data of the type T to the JSON log file.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - The data to be logged.
+    ///
     pub fn write_data<T: Serialize>(&self, data: T) -> std::io::Result<()> {
         
         let mut writer = BufWriter::new(&self.file);
@@ -59,17 +89,13 @@ impl Logger {
         Ok(())
     }
 
-    /// Function to retrieve all objects from a file
-    /// 
-    /// This function takes as a paramater a path to a file that holds JSON objects and then retrieves
-    /// all the objects and return them inside an iterator to the function caller.
-    /// 
-    /// Apperantly the function is robust enough to even be able to read an empty file and return with no problems, but so far
-    /// we don't really know how many objecst are retrieved from the file
-    /// 
-    ///  # Panics
-    /// 
-    /// This function panics in case the file does not exist.
+    /// Retrieves an iterator over the logged items in the JSON log file.
+    ///
+    /// # Returns
+    ///
+    /// A `Result` containing an iterator over items of type `Result<JSON_Value, JSONError>`,
+    /// or an `std::io::Error` if there was an issue reading from the log file.
+    ///
     pub fn retrieve_iterator(&self) -> Result<impl Iterator<Item = Result<JSON_Value, JSONError>>, std::io::Error> {
 
         let file = File::open(&self.file_name)?;
@@ -85,8 +111,45 @@ impl Logger {
     }
 }
 
+/// A generic binary logger for serializing and deserializing data of a specified type.
+///
+/// The `BinLogger` struct allows you to log data of a generic type to a binary file.
+/// It provides methods for creating a new logger, writing data to the log file, and
+/// retrieving an iterator over the logged items.
+/// 
+/// It uses the standard marker crate to be able to get the generic type that is going to be
+/// serialized and deserialized to and from the file. It can be used to serialize any struct
+/// for example as long as you derive the Serialize and Deserialize traits from serde such as
+/// 
+/// #[derive(Deserialize, Serialize)]
+/// Struct test {...}
+/// 
+/// 
+/// # Examples
+///
+/// ```
+/// use my_module::BinLogger;
+///
+/// // Create a new BinLogger for logging Dummy values to a file named "bin_test.log".
+/// let logger_bin: BinLogger<Dummy> = BinLogger::new("bin_test.log");
+///
+/// // Write data to the log file.
+/// logger.write_data(&42).expect("Failed to write data to log file");
+///
+/// // Retrieve an iterator over the logged items.
+/// let iterator = logger.retrieve_iterator().expect("Failed to retrieve iterator");
+/// for item in iterator {
+///     println!("Logged item: {}", item);
+/// }
+/// ```
+
+// The for<'a> is a generic lifetime paramater
+// in this context we are putting a trait bound on T where we say that this type
+// needs to have the Deserialize trait for any lifetime using the for<'a> Deserialize<'a>
 pub struct BinLogger<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>>{
+    // The file handle for the log file.
     file: File,
+    // The name of the log file.
     file_name:  String,
     // unsafe rust!
     _data_type: marker::PhantomData<T>
@@ -94,22 +157,40 @@ pub struct BinLogger<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>>{
 
 impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
 
+    /// Creates a new `BinLogger` instance for logging data to the specified file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A string representing the file path for the log file.
+    ///
     pub fn new(path: &str) -> BinLogger<T> {
         // creating the new log file
         let file = fs::OpenOptions::new().create(true).append(true).open(path);
 
         BinLogger { 
             file: file.unwrap(),
-            file_name: path.to_string(), 
+            file_name: path.to_string(),
+            // Marker to indicate the phantom data type.
             _data_type: PhantomData::<T>
         }    
     }
-
+    
+    /// Writes data of the generic type `T` to the binary log file.
+    ///
+    /// # Arguments
+    ///
+    /// * `data` - A reference to the data to be logged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `std::io::Result` indicating success or an error if the write operation fails.
+    ///
     pub fn write_data(&self, data: &T) -> std::io::Result<()> {
         
         let mut writer = BufWriter::new(&self.file);
         
-        let bytes = serde_cbor::to_vec(&data).expect("Failed to serialize");
+        // the same functionality of the serde_json::to_vec() function
+        let bytes = rmp_serde::to_vec(&data).expect("Failed to serialize");
         
         writer.write_all(&bytes)?;
         writer.flush()?;
@@ -118,25 +199,26 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
 
     }
 
+    /// Retrieves an iterator over the logged items in the binary log file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `std::io::Result` indicating success or an error if the read operation fails.
+    ///
     pub fn retrieve_iterator(&self) -> Result<impl Iterator<Item = T>, std::io::Error> {
         
         let file = File::open(&self.file_name)?;
-        let reader = BufReader::new(file);
+        let mut reader = BufReader::new(file);
 
-        let content = serde_cbor::from_reader(reader).into_iter();
+        // creating a vec of type T
+        let mut items: Vec<T> = Vec::new();
+        // We will be pushing items into the Vec<T> until the file is over
+        while let Ok(item) = rmp_serde::from_read::<_, T>(&mut reader) {
+            items.push(item);
+        }
 
-        Ok(content)
-
-    }
-
-    pub fn retrieve_obj(&self) -> Result<T, std::io::Error> {
-        
-        let file = File::open(&self.file_name)?;
-        let reader = BufReader::new(file);
-
-        let content: Result<T, CBORError> = serde_cbor::from_reader(reader);
-        
-        Ok(content.expect("Error in deserializing"))
+        // we return the Vec as an iterator
+        Ok(items.into_iter())
 
     }
 

@@ -1,5 +1,5 @@
 use std::io;
-use logging_system::{Logger, BinLogger};
+use logging_system::{JSONLogger, BinLogger};
 use serde::{Deserialize, Serialize};
 
 
@@ -20,7 +20,7 @@ fn main() {
 
     // creating two different logger objects, one to test JSON and one to test bin
     // JSON logger object
-    let logger_json = Logger::new("json_test.log");
+    let logger_json = JSONLogger::new("json_test.log");
     
     // Bin logger object associated with our type Dummy
     let logger_bin: BinLogger<Dummy> = BinLogger::new("bin_test.log");
@@ -107,11 +107,6 @@ fn main() {
                 }
             },
             5 => break,
-            6 => {
-                let object = logger_bin.retrieve_obj().unwrap();
-
-                println!("Dummy found {:#?}", object)
-            }
             _ => println!("Not a valid command!"),
         };
     }
