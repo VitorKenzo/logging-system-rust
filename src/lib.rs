@@ -210,15 +210,13 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
         let file = File::open(&self.file_name)?;
         let mut reader = BufReader::new(file);
 
-        // creating a vec of type T
-        let mut items: Vec<T> = Vec::new();
-        // We will be pushing items into the Vec<T> until the file is over
-        while let Ok(item) = rmp_serde::from_read::<_, T>(&mut reader) {
-            items.push(item);
-        }
+        // Use from_fn to create an iterator directly!!!
+        let iterator = std::iter::from_fn(move || {
+            rmp_serde::from_read::<_, T>(&mut reader).ok()
+        });
 
-        // we return the Vec as an iterator
-        Ok(items.into_iter())
+        // we return the iterator created
+        Ok(iterator)
 
     }
 
