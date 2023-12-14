@@ -81,10 +81,19 @@ fn main() {
                     // checking the contents
                     let mut dummies: Vec<Dummy> = Vec::new();
                     for item in objects {
-                        let json_item = item.unwrap();
-                        //println!("Got {:#?}", json_item);
-                        
-                        dummies.push(serde_json::from_value::<Dummy>(json_item).unwrap())
+                        match item {
+                            Ok(json_item) => {
+                                if let Ok(dummy) = serde_json::from_value::<Dummy>(json_item){
+                                    dummies.push(dummy);
+                                } else {
+                                    eprintln!("Error deserializing JSON item, terminating deserialization");
+                                    break;
+                                }
+                            }
+                            Err(err) => {
+                                eprintln!("Error retrieving JSON item: {:?}", err);
+                            }
+                        }
                     }
 
                     // printing the retrieved objects
