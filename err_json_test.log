@@ -8,3 +8,4 @@
 
 {"c": 123,               "comment":"test","id":2,"objects":[{"a":2,"b":2},{"a":2,"b":2},{"a":2,"b":2}]}
 {"id":3,"comment":"test","objects":[{"a":3,"b":3},{"a":3,"b":3},{"a":3,"b":3}]}
+{"id":0,"comment":"test","objects":[{"c":0,"b":0},{"a":0,"b":0},{"a":0,"b":0}]}

@@ -23,7 +23,7 @@ fn main() {
     let logger_json = JSONLogger::new("json_test.log");
     
     // Bin logger object associated with our type Dummy
-    let logger_bin: BinLogger<Dummy> = BinLogger::new("bin_test.log");
+    let logger_bin: BinLogger<Dummy> = BinLogger::new("crc_bin_test.log");
     
     // just so that objects have different ids
     let mut i = 0;
@@ -86,7 +86,7 @@ fn main() {
                                 if let Ok(dummy) = serde_json::from_value::<Dummy>(json_item){
                                     dummies.push(dummy);
                                 } else {
-                                    eprintln!("Error deserializing JSON item, terminating deserialization");
+                                    eprintln!("Error deserializing JSON item, terminating deserialization early");
                                     break;
                                 }
                             }

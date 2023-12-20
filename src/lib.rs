@@ -3,10 +3,11 @@
 //! We will give to ways to log the objects. One will be in the human-readable JSON format and the other
 //! will be using the binary format MessagePackr
 
-use std::{fs, fs::File, io::{Write, BufWriter, BufReader}, marker::{self, PhantomData}};
+use std::{fs, fs::File, io::{Write, BufWriter, BufReader, ErrorKind}, marker::{self, PhantomData}};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
 use serde_json::{Deserializer as JSONDeserializer, Value as JSON_Value, Error as JSONError};
 use rmp_serde;
+use crc32fast;
 
 /// A basic logger for serializing and deserializing data to and from a JSON log file.
 ///
@@ -191,6 +192,10 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
         
         // the same functionality of the serde_json::to_vec() function
         let bytes = rmp_serde::to_vec(&data).expect("Failed to serialize");
+
+        let crc = crc32fast::hash(&bytes);
+
+        println!("{:?}",crc);
         
         writer.write_all(&bytes)?;
         writer.flush()?;
@@ -212,7 +217,34 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
 
         // Use from_fn to create an iterator directly!!!
         let iterator = std::iter::from_fn(move || {
-            rmp_serde::from_read::<_, T>(&mut reader).ok()
+            match rmp_serde::from_read::<_, T>(&mut reader) {
+                Ok(value) => {
+                    
+                    let bytes = rmp_serde::to_vec(&value).expect("Failed to check crc");
+
+                    let crc =  crc32fast::hash(&bytes);
+
+                    println!("Object checksum recovered: {:?}", crc);
+
+                    Some(value)
+                },
+                Err(err) => {
+                    match err {
+                        rmp_serde::decode::Error::InvalidMarkerRead(io_error) => {
+                            if let ErrorKind::UnexpectedEof = io_error.kind() {
+                                return None
+                            } else {
+                                eprintln!("Error in the deserialization process: {:?}", io_error);
+                                None    
+                            }
+                        },
+                        _ => {
+                            eprintln!("Error in the deserialization process: {:?}", err);
+                            None
+                        } 
+                    }
+                },
+            }
         });
 
         // we return the iterator created
