@@ -226,9 +226,15 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
 
                     let crc_check =  crc32fast::hash(&bytes);
 
-                    let crc_bytes = rmp_serde::from_read::<_, u32>(&mut reader);
+                    let crc_bytes = match rmp_serde::from_read::<_, u32>(&mut reader){
+                        Ok(checsum) => checsum,
+                        Err(err) => {
+                            eprintln!("Failed to recover checksum: {:?}", err);
+                            return None
+                        },
+                    };
 
-                    if !(crc_check == crc_bytes.unwrap()) {
+                    if !(crc_check == crc_bytes) {
                         eprintln!("Checksum failed in deserialization process, terminating early");
                         return None
                     }
@@ -248,7 +254,7 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
                         },
                         _ => {
                             eprintln!("Error in the deserialization process: {:?}", err);
-                            return None
+                            None
                         } 
                     }
                 },
