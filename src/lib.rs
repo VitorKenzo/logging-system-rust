@@ -5,7 +5,7 @@
 
 use std::{fs, fs::File, io::{Write, BufWriter, BufReader, ErrorKind}, marker::{self, PhantomData}};
 use serde::{Serialize, Deserialize, de::DeserializeOwned};
-use serde_json::{Deserializer as JSONDeserializer, Value as JSON_Value, Error as JSONError};
+use serde_json::{Deserializer as JSON_Deserializer, Value as JSON_Value, Error as JSONError};
 use rmp_serde;
 use crc32fast;
 
@@ -103,7 +103,7 @@ impl JSONLogger {
         let reader = BufReader::new(file);
 
         // this can be a one liner
-        let deserializer = JSONDeserializer::from_reader(reader);
+        let deserializer = JSON_Deserializer::from_reader(reader);
         // the type of the below variable is serde_json::StreamDeserializer<'_, serde_json::de::IoRead<BufReader<File>>, Value>
         // more information here https://docs.rs/serde_json/latest/serde_json/struct.StreamDeserializer.html
         let iterator = deserializer.into_iter::<JSON_Value>();
@@ -195,9 +195,11 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
 
         let crc = crc32fast::hash(&bytes);
 
+        let crc_bytes = rmp_serde::to_vec(&crc).expect("Failed to serialize the checksum");
         println!("{:?}",crc);
         
         writer.write_all(&bytes)?;
+        writer.write_all(&crc_bytes)?;
         writer.flush()?;
 
         Ok(())
@@ -222,10 +224,16 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
                     
                     let bytes = rmp_serde::to_vec(&value).expect("Failed to check crc");
 
-                    let crc =  crc32fast::hash(&bytes);
+                    let crc_check =  crc32fast::hash(&bytes);
 
-                    println!("Object checksum recovered: {:?}", crc);
+                    let crc_bytes = rmp_serde::from_read::<_, u32>(&mut reader);
 
+                    if !(crc_check == crc_bytes.unwrap()) {
+                        eprintln!("Checksum failed in deserialization process, terminating early");
+                        return None
+                    }
+
+                    println!("CHECKSUM WORKED");
                     Some(value)
                 },
                 Err(err) => {
@@ -235,12 +243,12 @@ impl<T: Serialize + DeserializeOwned + for<'a> Deserialize<'a>> BinLogger<T>{
                                 return None
                             } else {
                                 eprintln!("Error in the deserialization process: {:?}", io_error);
-                                None    
+                                return None    
                             }
                         },
                         _ => {
                             eprintln!("Error in the deserialization process: {:?}", err);
-                            None
+                            return None
                         } 
                     }
                 },
